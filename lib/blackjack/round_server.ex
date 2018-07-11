@@ -1,6 +1,5 @@
 defmodule Blackjack.RoundServer do
   use GenServer
-  import Supervisor.Spec
   alias Blackjack.{PlayerNotifier, Round}
 
   @rounds_supervisor Blackjack.RoundsSup
@@ -36,13 +35,13 @@ defmodule Blackjack.RoundServer do
       Supervisor.start_link(
         [
           PlayerNotifier.child_spec(round_id, players),
-          worker(__MODULE__, [round_id, players])
+          {__MODULE__, [round_id, players]}
         ],
         strategy: :one_for_all
       )
 
   @doc false
-  def start_link(round_id, players),
+  def start_link([round_id, players]),
     do:
       GenServer.start_link(
         __MODULE__,
