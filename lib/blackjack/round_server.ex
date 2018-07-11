@@ -5,25 +5,26 @@ defmodule Blackjack.RoundServer do
 
   @rounds_supervisor Blackjack.RoundsSup
 
+  @type name :: Blackjack.RoundsSup
   @type id :: any
   @type player :: %{id: Round.player_id(), callback_mod: module, callback_arg: callback_arg}
   @type callback_arg :: any
 
-  @spec child_spec() :: Supervisor.Spec.spec()
+  @spec child_spec() :: {DynamicSupervisor, name: name, id: name, strategy: :one_for_one}
   def child_spec(),
-    do:
-      supervisor(
-        Supervisor,
-        [
-          [supervisor(__MODULE__, [], function: :start_supervisor)],
-          [strategy: :simple_one_for_one, name: @rounds_supervisor]
-        ],
-        id: @rounds_supervisor
-      )
+    do: {
+      DynamicSupervisor,
+      name: @rounds_supervisor, id: @rounds_supervisor, strategy: :one_for_one
+    }
 
   @spec start_playing(id, [player]) :: Supervisor.on_start_child()
   def start_playing(round_id, players),
-    do: Supervisor.start_child(@rounds_supervisor, [round_id, players])
+    do:
+      DynamicSupervisor.start_child(@rounds_supervisor, %{
+        id: __MODULE__,
+        start: {__MODULE__, :start_supervisor, [round_id, players]},
+        type: :supervisor
+      })
 
   @spec move(id, Round.player_id(), Round.move()) :: :ok
   def move(round_id, player_id, move),
