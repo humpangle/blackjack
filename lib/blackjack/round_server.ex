@@ -2,9 +2,9 @@ defmodule Blackjack.RoundServer do
   use GenServer
   alias Blackjack.{PlayerNotifier, Round}
 
-  @rounds_supervisor Blackjack.RoundsSup
+  @rounds_supervisor Blackjack.RoundDynamicSupervisor
 
-  @type name :: Blackjack.RoundsSup
+  @type name :: Blackjack.RoundDynamicSupervisor
   @type id :: any
   @type player :: %{id: Round.player_id(), callback_mod: module, callback_arg: callback_arg}
   @type callback_arg :: any
@@ -25,10 +25,6 @@ defmodule Blackjack.RoundServer do
         type: :supervisor
       })
 
-  @spec move(id, Round.player_id(), Round.move()) :: :ok
-  def move(round_id, player_id, move),
-    do: GenServer.call(service_name(round_id), {:move, player_id, move})
-
   @doc false
   def start_supervisor(round_id, players),
     do:
@@ -37,8 +33,13 @@ defmodule Blackjack.RoundServer do
           PlayerNotifier.child_spec(round_id, players),
           {__MODULE__, [round_id, players]}
         ],
-        strategy: :one_for_all
+        strategy: :one_for_all,
+        name: :"RoundServerSup__#{round_id}"
       )
+
+  @spec move(id, Round.player_id(), Round.move()) :: :ok
+  def move(round_id, player_id, move),
+    do: GenServer.call(service_name(round_id), {:move, player_id, move})
 
   @doc false
   def start_link([round_id, players]),
