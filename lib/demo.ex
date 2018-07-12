@@ -1,37 +1,34 @@
 defmodule Demo do
-  def run,
-    do:
-      start_round(
-        :"round_#{:erlang.unique_integer()}",
-        Enum.map(1..5, &:"player_#{&1}")
-      )
-
-  defp start_round(round_id, player_ids) do
-    Demo.AutoPlayer.Server.start_link(round_id, player_ids)
-
-    Blackjack.RoundServer.start_playing(
-      round_id,
-      Enum.map(player_ids, &Demo.AutoPlayer.Server.player_spec(round_id, &1))
-    )
-  end
-end
-
-defmodule Demo.AutoPlayer.Server do
   use GenServer
   @behaviour Blackjack.PlayerNotifier
 
-  alias Demo.AutoPlayer
+  alias Blackjack.Hand
   alias Blackjack.RoundServer
 
-  def start_link(round_id, player_ids),
-    do: GenServer.start_link(__MODULE__, {round_id, player_ids}, name: round_id)
+  def start_link(_opts \\ []) do
+    round_id = :"round_#{:erlang.unique_integer()}"
+    player_ids = Enum.map(1..5, &:"player_#{&1}")
 
-  def player_spec(round_id, player_id),
-    do: %{
-      id: player_id,
-      callback_mod: __MODULE__,
-      callback_arg: round_id
-    }
+    players_map =
+      player_ids
+      |> Enum.map(&{&1, Hand.new()})
+      |> Enum.into(%{})
+
+    state = %{round_id: round_id, players: players_map}
+    GenServer.start_link(__MODULE__, state, name: round_id)
+
+    players =
+      player_ids
+      |> Enum.map(
+        &%{
+          id: &1,
+          callback_mod: __MODULE__,
+          callback_arg: round_id
+        }
+      )
+
+    Blackjack.RoundServer.start_playing(round_id, players)
+  end
 
   @doc false
   def deal_card(round_id, player_id, card),
@@ -49,32 +46,36 @@ defmodule Demo.AutoPlayer.Server do
 
   @doc false
   def winners(round_id, player_id, winners) do
-    if Enum.member?(winners, player_id), do: GenServer.call(round_id, {:won, player_id})
+    if Enum.member?(winners, player_id),
+      do:
+        GenServer.call(
+          round_id,
+          {:won, player_id}
+        )
 
     :ok
   end
 
   @doc false
-  def init({round_id, player_ids}),
-    do:
-      {:ok,
-       %{
-         round_id: round_id,
-         players:
-           Enum.map(
-             player_ids,
-             &{&1, AutoPlayer.new()}
-           )
-           |> Enum.into(%{})
-       }}
+  def init(%{} = state) do
+    IO.puts("\n\nGame round: #{state.round_id} starting")
+
+    {:ok, state}
+  end
 
   def handle_call({:deal_card, player_id, card}, _from, state) do
-    IO.puts("#{player_id}: #{card.rank} of #{card.suit}")
+    IO.puts([
+      stringify_player(player_id, state.round_id),
+      ": #{card.rank} of #{card.suit}"
+    ])
 
     {
       :reply,
       :ok,
-      update_in(state.players[player_id], &AutoPlayer.deal(&1, card))
+      update_in(state.players[player_id], fn hand ->
+        {_, new_hand} = Hand.deal(hand, card)
+        new_hand
+      end)
     }
   end
 
@@ -82,50 +83,45 @@ defmodule Demo.AutoPlayer.Server do
   def handle_call({:move, player_id}, from, state) do
     GenServer.reply(from, :ok)
 
-    IO.puts("#{player_id}: thinking ...")
+    player_str = stringify_player(player_id, state.round_id)
 
-    next_move = state.players[player_id] |> AutoPlayer.next_move()
+    IO.puts([player_str, ": thinking ..."])
 
-    IO.puts("#{player_id}: #{next_move}")
+    hand = state.players[player_id]
+
+    :timer.seconds(2) |> :rand.uniform() |> Process.sleep()
+
+    next_move =
+      if :rand.uniform(11) + 10 < hand.score do
+        :stand
+      else
+        :hit
+      end
+
+    IO.puts([player_str, ": #{next_move}"])
 
     if next_move == :stand, do: IO.puts("")
 
     Blackjack.RoundServer.move(state.round_id, player_id, next_move)
+
     {:noreply, state}
   end
 
   def handle_call({:busted, player_id}, _from, state) do
-    IO.puts("#{player_id}: busted")
-    IO.puts("")
+    IO.puts([stringify_player(player_id, state.round_id), ": busted\n"])
     {:reply, :ok, state}
   end
 
   def handle_call({:won, player_id}, _from, %{round_id: round_id} = state) do
-    IO.puts("#{player_id}: won")
+    IO.puts([
+      stringify_player(player_id, round_id),
+      ": won!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n"
+    ])
 
     RoundServer.round_sup_name(round_id) |> Supervisor.stop()
 
     {:stop, :normal, state}
   end
-end
 
-defmodule Demo.AutoPlayer do
-  alias Blackjack.Hand
-
-  def new(), do: Hand.new()
-
-  def deal(hand, card) do
-    {_, hand} = Hand.deal(hand, card)
-    hand
-  end
-
-  def next_move(hand) do
-    :timer.sleep(:rand.uniform(:timer.seconds(2)))
-
-    if :rand.uniform(11) + 10 < hand.score do
-      :stand
-    else
-      :hit
-    end
-  end
+  defp stringify_player(player_id, round_id), do: "#{round_id}\t#{player_id}"
 end
