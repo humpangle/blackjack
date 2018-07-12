@@ -77,11 +77,13 @@ defmodule Blackjack.Round do
   end
 
   defp start_new_hand(round) do
+    [current_player_id | remaining_players] = round.remaining_players
+
     round = %Round{
       round
       | current_hand: Hand.new(),
-        current_player_id: hd(round.remaining_players),
-        remaining_players: tl(round.remaining_players)
+        current_player_id: current_player_id,
+        remaining_players: remaining_players
     }
 
     {:ok, round} = deal(round)
