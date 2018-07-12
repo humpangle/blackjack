@@ -68,6 +68,16 @@ defmodule Demo.AutoPlayer.Server do
            |> Enum.into(%{})
        }}
 
+  def handle_call({:deal_card, player_id, card}, _from, state) do
+    IO.puts("#{player_id}: #{card.rank} of #{card.suit}")
+
+    {
+      :reply,
+      :ok,
+      update_in(state.players[player_id], &AutoPlayer.deal(&1, card))
+    }
+  end
+
   @doc false
   def handle_call({:move, player_id}, from, state) do
     GenServer.reply(from, :ok)
@@ -82,16 +92,6 @@ defmodule Demo.AutoPlayer.Server do
 
     Blackjack.RoundServer.move(state.round_id, player_id, next_move)
     {:noreply, state}
-  end
-
-  def handle_call({:deal_card, player_id, card}, _from, state) do
-    IO.puts("#{player_id}: #{card.rank} of #{card.suit}")
-
-    {
-      :reply,
-      :ok,
-      update_in(state.players[player_id], &AutoPlayer.deal(&1, card))
-    }
   end
 
   def handle_call({:busted, player_id}, _from, state) do
