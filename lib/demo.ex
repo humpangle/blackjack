@@ -21,6 +21,7 @@ defmodule Demo.AutoPlayer.Server do
   @behaviour Blackjack.PlayerNotifier
 
   alias Demo.AutoPlayer
+  alias Blackjack.RoundServer
 
   def start_link(round_id, player_ids),
     do: GenServer.start_link(__MODULE__, {round_id, player_ids}, name: round_id)
@@ -93,15 +94,18 @@ defmodule Demo.AutoPlayer.Server do
     }
   end
 
-  def handle_call({:won, player_id}, _from, state) do
-    IO.puts("#{player_id}: won")
-    {:reply, :ok, state}
-  end
-
   def handle_call({:busted, player_id}, _from, state) do
     IO.puts("#{player_id}: busted")
     IO.puts("")
     {:reply, :ok, state}
+  end
+
+  def handle_call({:won, player_id}, _from, %{round_id: round_id} = state) do
+    IO.puts("#{player_id}: won")
+
+    RoundServer.round_sup_name(round_id) |> Supervisor.stop()
+
+    {:stop, :normal, state}
   end
 end
 

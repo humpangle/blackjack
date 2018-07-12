@@ -22,8 +22,12 @@ defmodule Blackjack.RoundServer do
       DynamicSupervisor.start_child(@rounds_supervisor, %{
         id: __MODULE__,
         start: {__MODULE__, :start_supervisor, [round_id, players]},
-        type: :supervisor
+        type: :supervisor,
+        restart: :transient
       })
+
+  def round_sup_name(round_id),
+    do: Blackjack.service_name({__MODULE__, "RoundServerSup__#{round_id}"})
 
   @doc false
   def start_supervisor(round_id, players),
@@ -34,7 +38,7 @@ defmodule Blackjack.RoundServer do
           {__MODULE__, [round_id, players]}
         ],
         strategy: :one_for_all,
-        name: :"RoundServerSup__#{round_id}"
+        name: round_sup_name(round_id)
       )
 
   @spec move(id, Round.player_id(), Round.move()) :: :ok
