@@ -1,6 +1,7 @@
 defmodule Blackjack.Round do
   alias __MODULE__
   alias Blackjack.Hand
+  alias Blackjack.Deck
 
   defstruct [
     :deck,
@@ -13,7 +14,7 @@ defmodule Blackjack.Round do
   ]
 
   @opaque t :: %Round{
-            deck: Blackjack.Deck.t(),
+            deck: Deck.t(),
             current_hand: Hand.t(),
             current_player_id: player_id,
             all_players: [player_id],
@@ -25,7 +26,7 @@ defmodule Blackjack.Round do
   @type instruction :: {:notify_player, player_id, player_instruction}
 
   @type player_instruction ::
-          {:deal_card, Blackjack.Deck.card()}
+          {:deal_card, Deck.card()}
           | :move
           | :busted
           | {:winners, [player_id]}
@@ -36,7 +37,7 @@ defmodule Blackjack.Round do
   @type move :: :stand | :hit
 
   @spec start([player_id]) :: {[instruction], t}
-  def start(players_ids), do: start(players_ids, Blackjack.Deck.shuffled())
+  def start(players_ids), do: start(players_ids, Deck.shuffled())
 
   @spec move(t, player_id, move) :: {[instruction], t}
   def move(%Round{current_player_id: player_id} = round, player_id, move),
@@ -67,7 +68,7 @@ defmodule Blackjack.Round do
   end
 
   defp start_new_hand(%Round{remaining_players: []} = round) do
-    winners = winners(round)
+    winners = winners(round.successful_hands)
 
     Enum.reduce(
       round.all_players,
@@ -111,17 +112,20 @@ defmodule Blackjack.Round do
 
   defp deal(round) do
     {:ok, card, deck} =
-      with {:error, :empty} <- Blackjack.Deck.take(round.deck),
-           do: Blackjack.Deck.shuffled() |> Blackjack.Deck.take()
+      with {:error, :empty} <- Deck.take(round.deck),
+           do:
+             Deck.shuffled()
+             |> Deck.take()
 
     {hand_status, hand} = Hand.deal(round.current_hand, card)
 
     round =
-      notify_player(
-        %Round{round | deck: deck, current_hand: hand},
-        round.current_player_id,
-        {:deal_card, card}
-      )
+      %Round{
+        round
+        | deck: deck,
+          current_hand: hand
+      }
+      |> notify_player(round.current_player_id, {:deal_card, card})
 
     {hand_status, round}
   end
@@ -131,19 +135,19 @@ defmodule Blackjack.Round do
     %Round{round | successful_hands: [hand_data | round.successful_hands]}
   end
 
-  defp winners(%Round{successful_hands: []}), do: []
+  defp winners([]), do: []
 
-  defp winners(round) do
-    max_score = Enum.max_by(round.successful_hands, & &1.hand.score).hand.score
+  defp winners(successful_hands) do
+    max_score = Enum.max_by(successful_hands, & &1.hand.score).hand.score
 
-    round.successful_hands
+    successful_hands
     |> Stream.filter(&(&1.hand.score == max_score))
     |> Stream.map(& &1.player_id)
     |> Enum.reverse()
   end
 
   defp notify_player(round, player_id, data),
-    do: %Round{round | instructions: [{:notify_player, player_id, data} | round.instructions]}
+    do: update_in(round.instructions, &[{:notify_player, player_id, data} | &1])
 
   defp instructions_and_state(round),
     do:

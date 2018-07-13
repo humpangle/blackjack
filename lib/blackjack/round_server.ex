@@ -17,20 +17,25 @@ defmodule Blackjack.RoundServer do
     }
 
   @spec start_playing(id, [player]) :: Supervisor.on_start_child()
-  def start_playing(round_id, players),
+  def start_playing(round_id, players, opts \\ [])
+
+  def start_playing(round_id, players, []),
+    do: start_playing(round_id, players, restart: :permanent)
+
+  def start_playing(round_id, players, opts),
     do:
       DynamicSupervisor.start_child(@rounds_supervisor, %{
         id: __MODULE__,
-        start: {__MODULE__, :start_supervisor, [round_id, players]},
+        start: {__MODULE__, :start_round_supervisor, [round_id, players]},
         type: :supervisor,
-        restart: :transient
+        restart: Keyword.fetch!(opts, :restart)
       })
 
   def round_sup_name(round_id),
     do: Blackjack.service_name({__MODULE__, "RoundServerSup__#{round_id}"})
 
   @doc false
-  def start_supervisor(round_id, players),
+  def start_round_supervisor(round_id, players),
     do:
       Supervisor.start_link(
         [

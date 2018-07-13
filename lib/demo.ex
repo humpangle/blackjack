@@ -27,7 +27,7 @@ defmodule Demo do
         }
       )
 
-    Blackjack.RoundServer.start_playing(round_id, players)
+    {:ok, _} = RoundServer.start_playing(round_id, players, restart: :transient)
   end
 
   @doc false
@@ -102,8 +102,7 @@ defmodule Demo do
 
     if next_move == :stand, do: IO.puts("")
 
-    Blackjack.RoundServer.move(state.round_id, player_id, next_move)
-
+    :ok = RoundServer.move(state.round_id, player_id, next_move)
     {:noreply, state}
   end
 
@@ -115,7 +114,7 @@ defmodule Demo do
   def handle_call({:won, player_id}, _from, %{round_id: round_id} = state) do
     IO.puts([
       stringify_player(player_id, round_id),
-      ": won!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n"
+      ": wins!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n"
     ])
 
     RoundServer.round_sup_name(round_id) |> Supervisor.stop()
