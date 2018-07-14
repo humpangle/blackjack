@@ -69,11 +69,13 @@ defmodule Blackjack.RoundServer do
 
   @doc false
   def handle_call({:move, player_id, move}, _from, state),
-    do:
-      {:reply, :ok,
-       state.round
-       |> Round.move(player_id, move)
-       |> handle_round_result(state)}
+    do: {
+      :reply,
+      :ok,
+      state.round
+      |> Round.move(player_id, move)
+      |> handle_round_result(state)
+    }
 
   defp service_name(round_id), do: Blackjack.service_name({__MODULE__, round_id})
 
