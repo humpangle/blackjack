@@ -8,6 +8,17 @@
       "type": "shell",
       "command": "iex --werl -S mix",
       "problemMatcher": ["$mixCompileWarning", "$mixCompileError"]
+    },
+
+    {
+      "label": "mix test ${file}",
+      "type": "shell",
+      "command": "mix test ${file}",
+      "problemMatcher": [
+        "$mixCompileWarning",
+        "$mixCompileError",
+        "$mixTestFailure"
+      ]
     }
   ]
 }

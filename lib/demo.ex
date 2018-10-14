@@ -89,7 +89,10 @@ defmodule Demo do
 
     hand = state.players[player_id]
 
-    :timer.seconds(2) |> :rand.uniform() |> Process.sleep()
+    2
+    |> :timer.seconds()
+    |> :rand.uniform()
+    |> Process.sleep()
 
     next_move =
       if :rand.uniform(11) + 10 < hand.score do
@@ -107,7 +110,11 @@ defmodule Demo do
   end
 
   def handle_call({:busted, player_id}, _from, state) do
-    IO.puts([stringify_player(player_id, state.round_id), ": busted\n"])
+    IO.puts([
+      stringify_player(player_id, state.round_id),
+      ": busted\n"
+    ])
+
     {:reply, :ok, state}
   end
 
@@ -117,7 +124,9 @@ defmodule Demo do
       ": wins!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n"
     ])
 
-    RoundServer.round_sup_name(round_id) |> Supervisor.stop()
+    round_id
+    |> RoundServer.round_sup_name()
+    |> Supervisor.stop()
 
     {:stop, :normal, state}
   end

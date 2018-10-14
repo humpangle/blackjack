@@ -16,7 +16,8 @@ defmodule Blackjack.RoundServer do
       name: @rounds_supervisor, id: @rounds_supervisor, strategy: :one_for_one
     }
 
-  @spec start_playing(id, [player]) :: Supervisor.on_start_child()
+  @spec start_playing(round_id :: id, players :: [player], opts :: List.t()) ::
+          Supervisor.on_start_child()
   def start_playing(round_id, players, opts \\ [])
 
   def start_playing(round_id, players, []),
@@ -40,7 +41,7 @@ defmodule Blackjack.RoundServer do
       Supervisor.start_link(
         [
           PlayerNotifier.child_spec(round_id, players),
-          {__MODULE__, [round_id, players]}
+          {__MODULE__, {round_id, players}}
         ],
         strategy: :one_for_all,
         name: round_sup_name(round_id)
@@ -51,7 +52,7 @@ defmodule Blackjack.RoundServer do
     do: GenServer.call(service_name(round_id), {:move, player_id, move})
 
   @doc false
-  def start_link([round_id, players]),
+  def start_link({round_id, players}),
     do:
       GenServer.start_link(
         __MODULE__,
